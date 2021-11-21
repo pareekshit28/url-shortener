@@ -26,7 +26,6 @@ admin.initializeApp({
 const db = admin.firestore()
 const app = express()
 
-const users = db.collection('users')
 const urls = db.collection('urls')
 
 app.use(cors())
@@ -37,52 +36,40 @@ app.use(bodyParser.urlencoded({extended : false}))
 
 app.post('/shortenUrl', async (req, res) => {
     const fullUrl = req.body.fullUrl
-    const user = req.body.user
-    const uid = nanoid(6)
 
     if (fullUrl === undefined) {
-        res.status(400).json({message : "Url is required", shortUrl : null})
-    } else if (user === undefined) {
-        res.status(400).json({message : "User is required", shortUrl : null})
+        res.status(400).json({message : "Url is required", fullUrl: null, shortUrl : null})
     } else {
         try {
-            await users.doc(user).collection("urls").add({ "shortUrl": uid })
-            await urls.doc(uid).set({ "fullUrl": fullUrl })
-            res.status(200).json({message : "Success", shortUrl : uid})
+            const query = await urls.where("fullUrl", "==", fullUrl).get()
+            if (query.empty) {
+                const uid = nanoid(6)
+                await urls.doc(uid).set({ "fullUrl": fullUrl, "shortUrl" : "https://pj-url-shortener.herokuapp.com/" + uid })
+                res.status(200).json({message : "Success", fullUrl: fullUrl, shortUrl : "https://pj-url-shortener.herokuapp.com/" + uid})
+            } else {
+                res.status(200).json({message : "Success", fullUrl: fullUrl, shortUrl : query.docs[0].data()["shortUrl"]})
+            }
         } catch (error) {
-            res.status(500).json({message : "Internal Error", shortUrl : null})
-        }
-    }
-})
-
-app.post('/getUserUrls', async (req, res) => {
-    const user = req.body.user
-
-    if (user === undefined) {
-        res.status(400).json({message : "User is required", urls : null})
-    } else {
-        try {
-            const docs = []
-            const urls = await users.doc(user).collection("urls").get()
-            urls.forEach((doc) => docs.push(doc.data()))
-            res.status(200).json({message: "Success", urls : docs})
-        } catch (error) {
-            res.status(500).json({message : "Internal Error", urls : null})
+            res.status(500).json({message : "Internal Error", fullUrl: null, shortUrl : null})
         }
     }
 })
 
 app.post('/getUrlClicks', async (req, res) => {
     const shortUrl = req.body.shortUrl
-
     if (shortUrl === undefined) {
         res.status(400).json({message : "ShortUrl is required", clicks : null})
     } else {
         try {
-            const docs = []
-            const clicks = await urls.doc(shortUrl).collection("clicks").get()
-            clicks.forEach((doc) => docs.push(doc.data()))
-            res.status(200).json({message: "Success", clicks : docs})
+            const query = await urls.where("shortUrl", "==", shortUrl).get()
+            if (query.empty) {
+                res.status(400).json({message : "Url not present in database", clicks : null})
+            } else {
+                const docs = []
+                const clicks = await urls.doc(query.docs[0].id).collection("clicks").get()
+                clicks.forEach((doc) => docs.push(doc.data()))
+                res.status(200).json({message: "Success", clicks : docs})
+            }
         } catch (error) {
             res.status(500).json({message : "Internal Error", clicks : null})
         }
