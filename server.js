@@ -36,7 +36,7 @@ app.use(bodyParser.urlencoded({extended : false}))
 
 
 app.post('/shortenUrl', async (req, res) => {
-    const fullUrl = req.body.url
+    const fullUrl = req.body.fullUrl
     const user = req.body.user
     const uid = nanoid(6)
 
